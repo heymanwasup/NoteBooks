@@ -2,9 +2,162 @@ import ROOT as R
 import os
 R.gStyle.SetOptFit(1111)
 
-
+ncount_ = 0
 dataset = 'Run2C' # default dataset
 isSave = False
+
+
+
+def ComparePU_energy(hists_e):
+    hists = []
+    for h in hists_e:
+        hists.append(h.Clone())
+
+    names = ['Raw','Corrected','Double','Triple']
+    colors = [R.kBlack,R.kBlue,R.kRed,R.kGreen]
+    c = R.TCanvas()
+    c.SetLogy(1)
+    leg = R.TLegend(0.65,0.6,0.9,0.9)
+    for n in range(4):
+        hists[n] = ABS(hists[n])
+        hists[n].SetStats(0)
+        hists[n].SetLineColor(colors[n])
+        hists[n].SetLineWidth(2)
+        hists[n].GetXaxis().SetRangeUser(1700,9000)
+        leg.AddEntry(hists[n],names[n],'l')
+        hists[n].Draw('histsame')
+        hists[n].SetTitle(';Energy [MeV]; N')
+    leg.Draw()
+    c.Draw()
+    return c,[*hists,leg]
+
+def ComparePU_ratio(hists_e):
+    hists = []
+    for h in hists_e:
+        hists.append(h.Clone())
+    c2 = R.TCanvas()
+    
+    ratio_i = hists[0]
+    pu = hists[2]
+    put = hists[3]
+    pu.Add(put)
+
+    ratio = pu.Clone()
+    ratio.Reset()
+    ratio.Sumw2()
+    ratio.Add(ratio_i)
+
+    if ratio.GetXaxis().GetBinWidth(1) == 10.:
+        ratio.Rebin(5)
+        pu.Rebin(5)
+
+    func = R.TF1('linefit','[0]',3400,5000)
+    ratio.Divide(pu)
+    ratio.GetXaxis().SetRangeUser(3100,5500)
+    ratio.GetYaxis().SetRangeUser(0.8,1.6)
+
+    
+    ratio.Draw('e')
+    ratio.SetMarkerSize(0.6)
+    ratio.SetMarkerColor(1)
+    ratio.SetMarkerStyle(8)
+    
+    ratio.SetLineColor(1)
+    ratio.SetTitle(';Energy [MeV]; Data / PU')
+    ratio.Fit('linefit','REMS')
+    
+    func.SetLineWidth(2)
+    
+
+    c2.Draw()
+    return c2,[ratio,'']
+
+def ComparePU_triple(hists_e):
+    hists = []
+    for h in hists_e:
+        hists.append(h.Clone())
+    
+    raw = hists[0]
+    pu_d = hists[2]
+    pu_t = hists[3]
+
+    corr_d = raw.Clone()
+    corr_d.Add(pu_d,-1)
+
+    names = ['Corr. double','Tripple']
+    colors = [R.kBlack,R.kBlue,R.kRed,R.kGreen]
+    hists = [corr_d,pu_t]
+
+    c = R.TCanvas()
+    c.SetLogy(1)
+    leg = R.TLegend(0.65,0.6,0.9,0.9)
+    for n in range(2):
+        if hists[n].GetXaxis().GetBinWidth(1) == 10.:
+            hists[n].Rebin(5)
+            
+
+        hists[n] = ABS(hists[n])
+
+        hists[n].SetStats(0)
+        hists[n].SetLineColor(colors[n])
+        hists[n].SetLineWidth(2)
+        hists[n].GetXaxis().SetRangeUser(3400,8000)
+        # hists[n].GetYaxis().SetRangeUser(-100,100)
+        leg.AddEntry(hists[n],names[n],'l')
+        hists[n].Draw('histsame')
+        hists[n].SetTitle(';Energy [MeV]; N')
+    leg.Draw()
+    c.Draw()
+    return c,[*hists,leg]
+
+def ComparePU(hists_e):
+    c1 = ComparePU_energy(hists_e)
+    c2 = ComparePU_ratio(hists_e)
+    c3 = ComparePU_triple(hists_e)
+    return c1,c2,c3
+
+def ComparePU_calos(hists_calos,func,leg=False):
+    global ncount_
+    c = R.TCanvas('%s'%(ncount_),'%s'%(ncount_),2400,1200)
+    c.SetLogy(1)
+    ncount_ += 1
+    c.Divide(6,4)
+    cs = []
+    for n in range(24):
+        sub_c1 = func(hists_calos[n])
+        cs.append(sub_c1[1])
+        pad = c.cd(n+1)
+        pad.SetLogy(1)
+        for obj in cs[-1][:-1]:            
+            obj.Draw('hsame')
+        c.cd(n+1)
+        if n==0 and leg:
+            cs[-1][-1].Draw()
+    c.cd(0)
+    c.Draw()
+    return c,cs
+            
+                
+
+    
+
+
+
+
+def ComparePU_calos_all(hists_calos):
+    # cs1 = ComparePU_energy(hists_calos[0])
+    cs1 = ComparePU_calos(hists_calos,ComparePU_energy,True)
+    cs2 = ComparePU_calos(hists_calos,ComparePU_ratio)
+    cs3 = ComparePU_calos(hists_calos,ComparePU_triple,True)
+    
+    return cs1,cs2,cs3
+
+    
+
+
+
+    
+    
 
 def ABS(hist):
     Nx = hist.GetNbinsX()
@@ -275,7 +428,7 @@ def DrawSensitivity(method,syst,range_x):
     chi2_res = 'Chi2 = %s at %s'%(min_y,min_x)
     sen_res  = 'Sensitivity = %s +- %s'%(s,se)
     # print (chi2_res)
-    # print (sen_res)    
+    # print (sen_res)
     c2.Draw()
     if isSave:
         os.system('mkdir -p %s'%(saveDir))
