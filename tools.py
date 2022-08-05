@@ -6,6 +6,12 @@ R.gStyle.SetOptFit(1111)
 dataset = 'Run2C' # default dataset
 isSave = False
 
+def ABS(hist):
+    Nx = hist.GetNbinsX()
+    for n in range(Nx):
+        v = hist.GetBinContent(n+1)
+        hist.SetBinContent(n+1,abs(v))
+    return hist
 
 def CmpSensitivity(method):
     nam_map = {
